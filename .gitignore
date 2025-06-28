@@ -1,0 +1,13 @@
+.terraform
+
+.terraform.lock.hcl
+
+text.txt
+
+terraform.tfstate
+terraform.tfstate.backup
+
+.architech.drawio
+
+s3⇨lambda⇨s3.zip
+
