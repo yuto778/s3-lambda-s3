@@ -2,45 +2,39 @@ name: Terraform CI/CD
 
 permissions:
   contents: read # checkout などでリポジトリを読む
-  pull-requests: write # PRにコメントするために必要
+  pull-requests: write
 
 on:
   pull_request:
-    branches: [dev] # devブランチへのプルリクエスト時にトリガー
+    branches: [dev]
   push:
-    branches: [main] # mainブランチへのプッシュ時にトリガー
-  workflow_dispatch: # 手動実行を許可
+    branches: [main]
+  workflow_dispatch:
     inputs:
       destroy:
-        description: "本当に destroy しますか？ ('yes'と入力すると実行されます)"
+        description: "本当に destroy しますか？"
         required: true
         default: "no"
-        type: choice
-        options:
-          - "no"
-          - "yes"
 
 env:
-  TF_WORKING_DIR: "./" # Terraformの作業ディレクトリ
-  TF_VERSION: "1.5.7" # 使用するTerraformのバージョン
-  AWS_REGION: "ap-northeast-1" # AWSリージョン
+  TF_WORKING_DIR: "./"
+  TF_VERSION: "1.5.7"
+  AWS_REGION: "ap-northeast-1"
 
 jobs:
   terraform-plan:
     name: "🗺️ Terraform Plan"
     runs-on: ubuntu-latest
-    # devブランチへのプルリクエスト時のみ実行
     if: github.event_name == 'pull_request' && github.base_ref == 'dev'
-    environment: production # 環境を指定 (GitHub Environmentsを使用)
+    environment: production
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }} # AWSアクセスキーID
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }} # AWSシークレットアクセスキー
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Setup Terraform
@@ -51,7 +45,6 @@ jobs:
       - name: Terraform Init (with backend-config)
         working-directory: ${{ env.TF_WORKING_DIR }}
         run: |
-          # S3とDynamoDBを状態管理のバックエンドとして初期化
           terraform init -reconfigure \
             -backend-config="bucket=${{ secrets.TF_BACKEND_BUCKET }}" \
             -backend-config="key=${{ secrets.TF_BACKEND_KEY }}" \
@@ -59,33 +52,28 @@ jobs:
             -backend-config="dynamodb_table=${{ secrets.TF_DYNAMODB_TABLE }}"
 
       - name: Terraform Plan
-        id: plan # ステップID
+        id: plan
         working-directory: ${{ env.TF_WORKING_DIR }}
-        # プラン結果をファイルに出力（色なし）
         run: terraform plan -no-color -input=false > plan.txt
 
       - name: Comment PR with Plan
         uses: marocchino/sticky-pull-request-comment@v2
         with:
-          path: plan.txt # 出力されたプランファイルをPRにコメント
-          recreate: true # コメントを毎回再作成
+          path: plan.txt
+          recreate: true
 
   terraform-apply:
     name: "🚀 Terraform Apply"
     runs-on: ubuntu-latest
-    needs: terraform-plan # planジョブが成功した場合にのみ実行 (ただし、push時はplanジョブは実行されないため、このneedsは主にはプルリクフローでは意味をなさないが、他のCI/CD構成を想定すると残しておくのも可)
-    # mainブランチへのプッシュ時のみ実行
+    needs: terraform-plan
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    environment: production # 環境を指定
+    environment: production
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }} # ここにSecretsを追加
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }} # ここにSecretsを追加
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Setup Terraform
@@ -104,23 +92,19 @@ jobs:
 
       - name: Terraform Apply
         working-directory: ${{ env.TF_WORKING_DIR }}
-        run: terraform apply -auto-approve # 自動承認でTerraformを適用
+        run: terraform apply -auto-approve
 
   terraform-destroy:
     name: "💣 Terraform Destroy"
     runs-on: ubuntu-latest
-    # workflow_dispatchでdestroy入力が'yes'の場合のみ実行
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.destroy == 'yes'
-    environment: production # 環境を指定
+    environment: production
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }} # ここにSecretsを追加
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }} # ここにSecretsを追加
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Setup Terraform
@@ -139,4 +123,4 @@ jobs:
 
       - name: Terraform Destroy
         working-directory: ${{ env.TF_WORKING_DIR }}
-        run: terraform destroy -auto-approve # 自動承認でリソースを破棄
+        run: terraform destroy -auto-approve
