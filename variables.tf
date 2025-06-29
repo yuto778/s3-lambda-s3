@@ -8,10 +8,10 @@ variable "project_name" {
 
 variable "source_bucket_name" {
   type    = string
-  default = "myapp-source-bucket"
+  default = "myfunction-source-bucket"
 }
 
 variable "target_bucket_name" {
   type    = string
-  default = "myapp-target-bucket"
+  default = "myfunction-target-bucket"
 }
