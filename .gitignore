@@ -11,3 +11,6 @@ terraform.tfstate.backup
 
 s3⇨lambda⇨s3.zip
 
+test/
+
+test2.txt

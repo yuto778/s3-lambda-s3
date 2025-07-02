@@ -9,39 +9,40 @@ s3 = boto3.client('s3')
 TARGET_BUCKET = os.environ['TARGET_BUCKET_NAME']
 
 def lambda_handler(event, context):
-    # 1. トリガー元バケット・キーの取得
-    source_bucket = event['Records'][0]['s3']['bucket']['name']
-    source_key = event['Records'][0]['s3']['object']['key']
+    # SQS の各レコードをループ
+    for sqs_record in event.get('Records', []):
+        # body が JSON 文字列になっているのでロード
+        body = json.loads(sqs_record['body'])
 
-    # 2. S3 からオブジェクトを取得
-    response = s3.get_object(Bucket=source_bucket, Key=source_key)
-    content = response['Body'].read().decode('utf-8')
+        print(json.dumps(body))
 
-    # 3. 簡易加工例：全行を大文字化
-    processed = content.upper()
+        # さらに body["Records"] に S3 イベント本体が入っている
+        for s3_event in body.get('Records', []):
+            source_bucket = s3_event['s3']['bucket']['name']
+            source_key    = s3_event['s3']['object']['key']
 
-    # 4. 保存先のバケットとキーを定義
-    dest_bucket = TARGET_BUCKET  # ← デプロイ後に実際のバケット名に置き換えてください
-    output_key = 'text/' + source_key.rsplit('.', 1)[0] + '.txt'
+            # S3 からオブジェクトを取得
+            obj = s3.get_object(Bucket=source_bucket, Key=source_key)
+            content = obj['Body'].read().decode('utf-8')
 
-    # 5. 別バケットに加工後の内容をアップロード
-    s3.put_object(
-        Bucket=dest_bucket,
-        Key=output_key,
-        Body=processed.encode('utf-8'),
-        ContentType='text/plain'
-    )
+            # 簡易加工（大文字化）
+            processed = content.upper()
 
-    # 6. ログ出力
-    print(f'Processed file saved to {dest_bucket}/{output_key}')
+            # 保存先キーを決定
+            dest_key = 'text/' + source_key.rsplit('.', 1)[0] + '.txt'
 
-    print('成功したよー')
+            # 別バケットへアップロード
+            s3.put_object(
+                Bucket=TARGET_BUCKET,
+                Key=dest_key,
+                Body=processed.encode('utf-8'),
+                ContentType='text/plain'
+            )
+
+            print(f"成功したよーn\ Copied s3://{source_bucket}/{source_key} → s3://{TARGET_BUCKET}/{dest_key}")
 
     return {
-        'statusCode': 200,
-        'body': json.dumps({
-            "message":"success"
-        })
+        "statusCode": 200,
+        "body": json.dumps({ "message": "success" })
     }
-
     

@@ -44,6 +44,18 @@ data "aws_iam_policy_document" "policy" {
     ]
   }
 
+  statement {
+    sid = "SQSAccess"
+    actions = [
+      "sqs:ReceiveMessage",
+      "sqs:DeleteMessage",
+      "sqs:GetQueueAttributes",
+    ]
+    resources = [
+      var.sqs_queue_arn
+    ]
+  }
+
 }
 
 # 作成したポリシーをIAMポリシーとして登録
@@ -80,6 +92,7 @@ resource "aws_lambda_function" "this" {
     variables = {
       TARGET_BUCKET      = var.target_bucket_arn
       TARGET_BUCKET_NAME = var.target_bucket_name
+      SQS_QUEUE_URL      = var.sqs_queue_url
     }
   }
 

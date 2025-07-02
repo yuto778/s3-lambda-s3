@@ -23,3 +23,11 @@ variable "target_bucket_arn" {
 variable "target_bucket_name" {
   type = string
 }
+
+variable "sqs_queue_arn" {
+  type = string
+
+}
+variable "sqs_queue_url" {
+  type = string
+}
